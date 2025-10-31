@@ -1,31 +1,33 @@
-const Builder = @import("std").build.Builder;
+const std = @import("std");
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     const exe = b.addExecutable(.{
-        .name = "sdl-zig-demo",
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    if (target.isNativeOs() and target.getOsTag() == .linux) {
-        // The SDL package doesn't work for Linux yet, so we rely on system
-        // packages for now.
-        exe.linkSystemLibrary("SDL2");
-        exe.linkLibC();
-    } else {
-        const sdl_dep = b.dependency("sdl", .{
-            .optimize = .ReleaseFast,
+        .name = "sdl_zig_demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
             .target = target,
-        });
-        exe.linkLibrary(sdl_dep.artifact("SDL2"));
+            .optimize = optimize,
+        }),
+    });
+
+    switch (target.result.os.tag) {
+        .macos, .linux => {
+            exe.linkSystemLibrary("SDL2");
+            exe.linkLibC();
+        },
+        .windows => {
+            exe.linkSystemLibrary("SDL2main");
+            exe.linkSystemLibrary("SDL2");
+        },
+        else => {},
     }
 
     b.installArtifact(exe);
 
-    const run = b.step("run", "Run the demo");
     const run_cmd = b.addRunArtifact(exe);
-    run.dependOn(&run_cmd.step);
+    const run_step = b.step("run", "Run the demo");
+    run_step.dependOn(&run_cmd.step);
 }
